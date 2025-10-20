@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>班級相簿網站</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            box-sizing: border-box;
+        }
+        .photo-scroll {
+            scroll-behavior: smooth;
+        }
+        .photo-item {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .photo-item:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .modal {
+            backdrop-filter: blur(5px);
+        }
+        .category-tab {
+            transition: all 0.3s ease;
+        }
+        .category-tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-full">
+    <header class="bg-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <h1 class="text-3xl font-bold text-indigo-600">🎓 班級相簿</h1>
+                <div class="flex items-center space-x-4">
+                    <span id="userStatus" class="text-gray-600">未登入</span>
+                    <button id="loginBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        登入管理
+                    </button>
+                    <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors hidden">
+                        登出
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8">
+        <!-- 管理員控制面板 -->
+        <div id="adminPanel" class="bg-white rounded-lg shadow-lg p-6 mb-8 hidden">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">📝 管理員控制面板</h2>
+            
+            <!-- 新增分類 -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold mb-2">新增分類</h3>
+                <div class="flex space-x-2">
+                    <input type="text" id="newCategoryName" placeholder="分類名稱" 
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <button id="addCategoryBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        新增分類
+                    </button>
+                </div>
+            </div>
+
+            <!-- 上傳相片 -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold mb-2">上傳相片</h3>
+                <div class="flex space-x-2 mb-2">
+                    <input type="text" id="photoUrl" placeholder="相片網址 (https://...)" 
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <select id="photoCategory" class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="">選擇分類</option>
+                    </select>
+                    <button id="addPhotoBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        新增相片
+                    </button>
+                </div>
+                <input type="text" id="photoTitle" placeholder="相片標題" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+
+            <!-- 管理現有分類 -->
+            <div>
+                <h3 class="text-lg font-semibold mb-2">管理分類</h3>
+                <div id="categoryManagement" class="space-y-2">
+                    <!-- 分類管理項目會動態生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 分類標籤 -->
+        <div class="mb-8">
+            <div class="flex flex-wrap gap-2" id="categoryTabs">
+                <button class="category-tab active px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors" data-category="all">
+                    全部相片
+                </button>
+            </div>
+        </div>
+
+        <!-- 相片展示區 -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6" id="currentCategoryTitle">📸 全部相片</h2>
+            <div id="photoGallery" class="photo-scroll overflow-x-auto">
+                <div class="flex space-x-4 pb-4" id="photoContainer">
+                    <!-- 相片會動態生成 -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 登入模態框 -->
+    <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 modal hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">🔐 管理員登入</h2>
+            <form id="loginForm">
+                <div class="mb-4">
+                    <label for="username" class="block text-sm font-medium text-gray-700 mb-2">帳號</label>
+                    <input type="text" id="username" name="username" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="mb-6">
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-2">密碼</label>
+                    <input type="password" id="password" name="password" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="flex space-x-4">
+                    <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg transition-colors">
+                        登入
+                    </button>
+                    <button type="button" id="cancelLogin" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 rounded-lg transition-colors">
+                        取消
+                    </button>
+                </div>
+            </form>
+            <div class="mt-4 text-sm text-gray-600">
+                <p>測試帳號：admin</p>
+                <p>測試密碼：123456</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 相片詳細檢視模態框 -->
+    <div id="photoModal" class="fixed inset-0 bg-black bg-opacity-75 modal hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-4 max-w-4xl max-h-full mx-4 overflow-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="photoModalTitle" class="text-xl font-bold text-gray-800"></h3>
+                <button id="closePhotoModal" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+            </div>
+            <img id="photoModalImage" src="" alt="" class="w-full h-auto rounded-lg">
+            <div id="photoModalAdmin" class="mt-4 hidden">
+                <button id="deletePhotoBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    刪除相片
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 應用程式狀態
+        let isLoggedIn = false;
+        let currentCategory = 'all';
+        let currentPhotoId = null;
+        
+        // 資料儲存
+        let categories = [
+            { id: 'school-life', name: '校園生活', photos: [] },
+            { id: 'activities', name: '班級活動', photos: [] },
+            { id: 'graduation', name: '畢業典禮', photos: [] }
+        ];
+        
+        let photos = [
+            { id: 1, url: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=400', title: '開學第一天', category: 'school-life' },
+            { id: 2, url: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=400', title: '班級合照', category: 'school-life' },
+            { id: 3, url: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=400', title: '運動會', category: 'activities' },
+            { id: 4, url: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400', title: '科學實驗', category: 'school-life' },
+            { id: 5, url: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400', title: '畢業典禮', category: 'graduation' },
+            { id: 6, url: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400', title: '班級討論', category: 'school-life' }
+        ];
+
+        // DOM 元素
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const loginModal = document.getElementById('loginModal');
+        const loginForm = document.getElementById('loginForm');
+        const cancelLogin = document.getElementById('cancelLogin');
+        const userStatus = document.getElementById('userStatus');
+        const adminPanel = document.getElementById('adminPanel');
+        const categoryTabs = document.getElementById('categoryTabs');
+        const photoContainer = document.getElementById('photoContainer');
+        const currentCategoryTitle = document.getElementById('currentCategoryTitle');
+        const photoModal = document.getElementById('photoModal');
+        const closePhotoModal = document.getElementById('closePhotoModal');
+
+        // 初始化應用程式
+        function init() {
+            renderCategories();
+            renderPhotos();
+            setupEventListeners();
+        }
+
+        // 設定事件監聽器
+        function setupEventListeners() {
+            loginBtn.addEventListener('click', () => {
+                loginModal.classList.remove('hidden');
+            });
+
+            logoutBtn.addEventListener('click', logout);
+
+            cancelLogin.addEventListener('click', () => {
+                loginModal.classList.add('hidden');
+            });
+
+            loginForm.addEventListener('submit', handleLogin);
+
+            closePhotoModal.addEventListener('click', () => {
+                photoModal.classList.add('hidden');
+            });
+
+            // 管理員功能
+            document.getElementById('addCategoryBtn').addEventListener('click', addCategory);
+            document.getElementById('addPhotoBtn').addEventListener('click', addPhoto);
+            document.getElementById('deletePhotoBtn').addEventListener('click', deleteCurrentPhoto);
+        }
+
+        // 處理登入
+        function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (username === 'admin' && password === '123456') {
+                isLoggedIn = true;
+                updateUIForLogin();
+                loginModal.classList.add('hidden');
+                document.getElementById('loginForm').reset();
+            } else {
+                showMessage('帳號或密碼錯誤！', 'error');
+            }
+        }
+
+        // 登出
+        function logout() {
+            isLoggedIn = false;
+            updateUIForLogout();
+        }
+
+        // 更新登入後的UI
+        function updateUIForLogin() {
+            userStatus.textContent = '管理員已登入';
+            loginBtn.classList.add('hidden');
+            logoutBtn.classList.remove('hidden');
+            adminPanel.classList.remove('hidden');
+            updateCategorySelect();
+            renderCategoryManagement();
+        }
+
+        // 更新登出後的UI
+        function updateUIForLogout() {
+            userStatus.textContent = '未登入';
+            loginBtn.classList.remove('hidden');
+            logoutBtn.classList.add('hidden');
+            adminPanel.classList.add('hidden');
+        }
+
+        // 渲染分類標籤
+        function renderCategories() {
+            const allTab = categoryTabs.querySelector('[data-category="all"]');
+            categoryTabs.innerHTML = '';
+            categoryTabs.appendChild(allTab);
+
+            categories.forEach(category => {
+                const tab = document.createElement('button');
+                tab.className = 'category-tab px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors';
+                tab.setAttribute('data-category', category.id);
+                tab.textContent = category.name;
+                tab.addEventListener('click', () => switchCategory(category.id));
+                categoryTabs.appendChild(tab);
+            });
+        }
+
+        // 切換分類
+        function switchCategory(categoryId) {
+            currentCategory = categoryId;
+            
+            // 更新標籤樣式
+            document.querySelectorAll('.category-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector(`[data-category="${categoryId}"]`).classList.add('active');
+
+            // 更新標題
+            if (categoryId === 'all') {
+                currentCategoryTitle.textContent = '📸 全部相片';
+            } else {
+                const category = categories.find(c => c.id === categoryId);
+                currentCategoryTitle.textContent = `📸 ${category.name}`;
+            }
+
+            renderPhotos();
+        }
+
+        // 渲染相片
+        function renderPhotos() {
+            const filteredPhotos = currentCategory === 'all' 
+                ? photos 
+                : photos.filter(photo => photo.category === currentCategory);
+
+            photoContainer.innerHTML = '';
+
+            if (filteredPhotos.length === 0) {
+                photoContainer.innerHTML = '<div class="text-gray-500 text-center py-8">此分類暫無相片</div>';
+                return;
+            }
+
+            filteredPhotos.forEach(photo => {
+                const photoElement = document.createElement('div');
+                photoElement.className = 'photo-item flex-shrink-0 cursor-pointer';
+                photoElement.innerHTML = `
+                    <div class="w-64 h-48 bg-gray-200 rounded-lg overflow-hidden shadow-md">
+                        <img src="${photo.url}" alt="${photo.title}" 
+                             class="w-full h-full object-cover"
+                             onerror="this.src=''; this.alt='圖片載入失敗'; this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full text-gray-500\\'>圖片載入失敗</div>';">
+                        <div class="p-3 bg-white">
+                            <h3 class="font-semibold text-gray-800 truncate">${photo.title}</h3>
+                        </div>
+                    </div>
+                `;
+                photoElement.addEventListener('click', () => openPhotoModal(photo));
+                photoContainer.appendChild(photoElement);
+            });
+        }
+
+        // 開啟相片詳細檢視
+        function openPhotoModal(photo) {
+            currentPhotoId = photo.id;
+            document.getElementById('photoModalTitle').textContent = photo.title;
+            document.getElementById('photoModalImage').src = photo.url;
+            document.getElementById('photoModalImage').alt = photo.title;
+            
+            if (isLoggedIn) {
+                document.getElementById('photoModalAdmin').classList.remove('hidden');
+            } else {
+                document.getElementById('photoModalAdmin').classList.add('hidden');
+            }
+            
+            photoModal.classList.remove('hidden');
+        }
+
+        // 新增分類
+        function addCategory() {
+            const name = document.getElementById('newCategoryName').value.trim();
+            if (!name) {
+                showMessage('請輸入分類名稱！', 'error');
+                return;
+            }
+
+            const id = name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+            if (categories.find(c => c.id === id)) {
+                showMessage('分類已存在！', 'error');
+                return;
+            }
+
+            categories.push({ id, name, photos: [] });
+            document.getElementById('newCategoryName').value = '';
+            renderCategories();
+            updateCategorySelect();
+            renderCategoryManagement();
+            showMessage('分類新增成功！', 'success');
+        }
+
+        // 新增相片
+        function addPhoto() {
+            const url = document.getElementById('photoUrl').value.trim();
+            const title = document.getElementById('photoTitle').value.trim();
+            const category = document.getElementById('photoCategory').value;
+
+            if (!url || !title || !category) {
+                showMessage('請填寫完整資訊！', 'error');
+                return;
+            }
+
+            if (!url.startsWith('https://')) {
+                showMessage('請使用 https:// 開頭的網址！', 'error');
+                return;
+            }
+
+            const newPhoto = {
+                id: Date.now(),
+                url,
+                title,
+                category
+            };
+
+            photos.push(newPhoto);
+            document.getElementById('photoUrl').value = '';
+            document.getElementById('photoTitle').value = '';
+            document.getElementById('photoCategory').value = '';
+            renderPhotos();
+            showMessage('相片新增成功！', 'success');
+        }
+
+        // 刪除當前相片
+        function deleteCurrentPhoto() {
+            if (!currentPhotoId) return;
+
+            const photoIndex = photos.findIndex(p => p.id === currentPhotoId);
+            if (photoIndex !== -1) {
+                photos.splice(photoIndex, 1);
+                photoModal.classList.add('hidden');
+                renderPhotos();
+                showMessage('相片已刪除！', 'success');
+            }
+        }
+
+        // 更新分類選擇器
+        function updateCategorySelect() {
+            const select = document.getElementById('photoCategory');
+            select.innerHTML = '<option value="">選擇分類</option>';
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category.id;
+                option.textContent = category.name;
+                select.appendChild(option);
+            });
+        }
+
+        // 渲染分類管理
+        function renderCategoryManagement() {
+            const container = document.getElementById('categoryManagement');
+            container.innerHTML = '';
+
+            categories.forEach(category => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg';
+                div.innerHTML = `
+                    <span class="font-medium">${category.name}</span>
+                    <button class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                            onclick="deleteCategory('${category.id}')">
+                        刪除
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // 刪除分類
+        function deleteCategory(categoryId) {
+            const categoryIndex = categories.findIndex(c => c.id === categoryId);
+            if (categoryIndex !== -1) {
+                // 刪除該分類的所有相片
+                photos = photos.filter(photo => photo.category !== categoryId);
+                categories.splice(categoryIndex, 1);
+                
+                // 如果當前檢視的是被刪除的分類，切換到全部
+                if (currentCategory === categoryId) {
+                    switchCategory('all');
+                }
+                
+                renderCategories();
+                updateCategorySelect();
+                renderCategoryManagement();
+                renderPhotos();
+                showMessage('分類已刪除！', 'success');
+            }
+        }
+
+        // 顯示訊息
+        function showMessage(message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `fixed top-4 right-4 px-4 py-2 rounded-lg text-white z-50 ${
+                type === 'success' ? 'bg-green-500' : 'bg-red-500'
+            }`;
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 3000);
+        }
+
+        // 初始化應用程式
+        init();
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'991549e9b0efa9cb',t:'MTc2MDkyOTQ3Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
